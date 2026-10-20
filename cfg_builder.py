@@ -98,6 +98,10 @@ class CFGBuilder:
         return continuation.id #retorna o ID do bloco na seuqnacia dos blocos de condicao
 
     def _build_while(self, statement: WhileStmt, current: BlockId) -> BlockId | None: #cria o teste, o corpo e a volta do laço
-        """TODO: construa o fluxo do laço e devolva sua continuação."""
+        condition_entry = self.cfg.new_block() #um bloco  para o teste, fica somente esse teste pq o caminho tem que voltar para testar novamente sem repetir oq estava anteriromente
+        body_entry = self.cfg.new_block() #bloco onde coloca os comandos das chaves dentro do while
+        self.cfg.terminate(current, Jump(condition_entry.id))#conecta o bloco anterior a do while a ele
 
-        raise NotImplementedError("implemente CFGBuilder._build_while")
+        body_continuation = self._build_block(statement.body, body_entry.id) #percorre os comandos dentro das chaves do while e coloca no bloco
+        if body_continuation is not None: #ve c chegou ao fim do corpo sem terminar em retorno
+            self.cfg.terminate(body_continuation, Jump(condition_entry.id))#conecta de volta ao bloco que testa a condicao
