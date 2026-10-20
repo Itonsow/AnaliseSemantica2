@@ -65,13 +65,37 @@ class CFGBuilder:
         if isinstance(statement, ReturnStmt): #verifica se o statement pertence a uma classe retorno
             self.cfg.terminate(current, Return(statement))# Define o retorno como o terminate
             return None #devolve None, n continua para o proximo comando
+
+        if isinstance(statement, IfStmt):
+            return self._build_if(statement, current)
+
+        if isinstance(statement, WhileStmt):
+            return self._build_while(statement, current)
         
-        raise NotImplementedError("implemente CFGBuilder._build_statement")
 
     def _build_if(self, statement: IfStmt, current: BlockId) -> BlockId | None: #crua os caminhos verdadeiro e falso
-        """TODO: construa o fluxo da condicional e devolva sua continuação."""
+        then_entry = self.cfg.new_block() #cria um novo bloco para o caminho verdadeiro
+        else_entry = self.cfg.new_block() #cria outro para o falso
 
-        raise NotImplementedError("implemente CFGBuilder._build_if")
+        branch = Branch(statement.condition, then_entry.id, else_entry.id) #coloca me branch a condição, e os dois ID, do falso e do verdadeiro
+        self.cfg.terminate(current, branch) # coloca o branch como terminador e registra os dois caminhos
+
+        then_continuation = self._build_block(statement.then_block, then_entry.id) #pega oq tem dentro do caminho e coloca no bloco entry
+        if statement.else_block is not None: #verifica se tem else
+            else_continuation = self._build_block(statement.else_block, else_entry.id) #se tiver, coloca as intruções dentro do blco
+        else:
+            else_continuation = else_entry.id
+
+        if then_continuation is None and else_continuation is None: #se caso ambos tiverem return como opção, retorna None, n tem como contiunuar
+            return None
+
+        continuation = self.cfg.new_block() #novo bloco para as duas possibilidades de caminhos, tanto verdaderio quanto falso
+        if then_continuation is not None: #caso n acabe na condicao(n tenha um return) vai pro prox bloco
+            self.cfg.terminate(then_continuation, Jump(continuation.id))
+        if else_continuation is not None:
+            self.cfg.terminate(else_continuation, Jump(continuation.id))
+
+        return continuation.id #retorna o ID do bloco na seuqnacia dos blocos de condicao
 
     def _build_while(self, statement: WhileStmt, current: BlockId) -> BlockId | None: #cria o teste, o corpo e a volta do laço
         """TODO: construa o fluxo do laço e devolva sua continuação."""
