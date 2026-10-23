@@ -1,11 +1,12 @@
-"""Construa um CFG auxiliar por função, preservando os nós da AST."""
-
 from __future__ import annotations
 
 import load_previous  # Disponibiliza os módulos das etapas anteriores.
 
-from ast_nodes import Block, FunctionDecl, IfStmt, Stmt, WhileStmt
-from cfg import BlockId, CFG, Jump
+from ast_nodes import (
+    Assignment, Block, BoolLiteral, CallStmt, FunctionDecl,
+    IfStmt, PrintStmt, ReturnStmt, Stmt, VarDecl, WhileStmt,
+)
+from cfg import BlockId, Branch, CFG, Jump, Return, ScopeExit
 
 #um bloco básico agrupa operações sequenciais até encontrar uma mudança no fluxo de controle
 class CFGBuilder:
@@ -15,7 +16,7 @@ class CFGBuilder:
         self.cfg.terminate(self.cfg.entry, Jump(body_entry.id))
         continuation = self._build_block(function.body, body_entry.id) #percorrer a AST e contruir o fluxo.... funcition.body - block da AST
         #continuation vai receber um ID do bloco do CFG que ainda esta aberto depois de percorrer o corpo
-        if continuation is not None:  #escopos diferentes podem continuar no mesmo bloco pq são sequenciais
+        if continuation is not None:   # existe caminho que chegou ao fim da função sem retornar
             self.cfg.terminate(continuation, Jump(self.cfg.fallthrough_exit)) 
         return self.cfg  #retorna grafo contruido
 
@@ -48,7 +49,7 @@ class CFGBuilder:
             return current #retorna o id do bloco
 
         if isinstance(statement, Assignment):  #verifica se o statement pertence a uma classe de atribuicao
-            cfg_block = self.cfg.blocks[current] #pega o ID
+            cfg_block = self.cfg.blocks[current] # pega o objeto do bloco pelo IDS
             cfg_block.operations.append(statement) #add
             return current
 
@@ -72,7 +73,9 @@ class CFGBuilder:
         if isinstance(statement, WhileStmt):
             return self._build_while(statement, current)
         
+        raise TypeError(f"comando desconhecido: {type(statement).__name__}")
 
+    
     def _build_if(self, statement: IfStmt, current: BlockId) -> BlockId | None: #crua os caminhos verdadeiro e falso
         then_entry = self.cfg.new_block() #cria um novo bloco para o caminho verdadeiro
         else_entry = self.cfg.new_block() #cria outro para o falso
@@ -105,3 +108,14 @@ class CFGBuilder:
         body_continuation = self._build_block(statement.body, body_entry.id) #percorre os comandos dentro das chaves do while e coloca no bloco
         if body_continuation is not None: #ve c chegou ao fim do corpo sem terminar em retorno
             self.cfg.terminate(body_continuation, Jump(condition_entry.id))#conecta de volta ao bloco que testa a condicao
+
+        if isinstance(statement.condition, BoolLiteral):  #v c a condicao do while é um literal bool
+            if statement.condition.value is True: #se for while(true), ele sempre vai entrar no corpo
+                self.cfg.terminate(condition_entry.id, Jump(body_entry.id))
+                return None #N tem saida para o comando seguinte
+
+        continuation = self.cfg.new_block()  #blco para receber os comandos depois do laço
+       
+        branch = Branch(statement.condition, body_entry.id, continuation.id) #coloca em branch a condicao, o bloco do while e bloco dps do while
+        self.cfg.terminate(condition_entry.id, branch) #mandamos para o terminate faz os caminhos possiveis para as possibilidades
+        return continuation.id #devolve o ID do bloco depois do while
