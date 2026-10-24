@@ -19,14 +19,14 @@ class Jump:
 
 
 @dataclass(frozen=True, slots=True)
-class Branch:
+class Branch:    #verifica uma condicao e define os dois possiveis destinos  (usar pra if e while)
     condition: Expr
     true_target: BlockId
     false_target: BlockId
 
 
 @dataclass(frozen=True, slots=True)
-class Return:
+class Return:  #conecta a saida por retorno
     statement: ReturnStmt
 
 
@@ -35,7 +35,7 @@ class Stop:
     """Terminador das saídas artificiais, que não possuem sucessores."""
 
 
-Terminator = Jump | Branch | Return | Stop
+Terminator = Jump | Branch | Return | Stop   #oq termina um BasicBlock e determina onde o fluxo vai depois
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,7 +52,7 @@ class ScopeExit:
 Operation = Stmt | ScopeExit
 
 
-@dataclass(slots=True)
+@dataclass(slots=True)  #bloco basico do CFG, que vao ser ligados pelas arestas
 class BasicBlock:
     id: BlockId
     operations: list[Operation] = field(default_factory=list)
@@ -64,60 +64,63 @@ class BasicBlock:
     # Condições e expressões de retorno estão nos respectivos terminadores.
 
 
-class CFG:
+class CFG:  #grafo completo de uma funcao, vai contruir o grafo, quem vai passar os "comados" é o CFGBuilder
     def __init__(self, function: FunctionDecl) -> None:
-        self.function = function
-        self.blocks: dict[BlockId, BasicBlock] = {}
-        self._next_id = 0
+        self.function = function  #funcao da AST que vai ser analisada
+        self.blocks: dict[BlockId, BasicBlock] = {} #dicionario que vai guardar os blocos basicos
+        self._next_id = 0 #quantidade de b locos
 
-        self.entry = self.new_block().id
-        self.return_exit = self.new_block().id
-        self.fallthrough_exit = self.new_block().id
+        self.entry = self.new_block().id  #entrada da funcao, self.entry guiarda somente o id
+        self.return_exit = self.new_block().id #saida
+        self.fallthrough_exit = self.new_block().id  #saida sem retorno
 
-        self.terminate(self.return_exit, Stop())
-        self.terminate(self.fallthrough_exit, Stop())
+        self.terminate(self.return_exit, Stop())  #dps de return, n tem nenhum bloco
+        self.terminate(self.fallthrough_exit, Stop()) #tbm n tem dps
 
-    def new_block(self) -> BasicBlock:
-        block = BasicBlock(id=self._next_id)
-        self.blocks[block.id] = block
-        self._next_id += 1
-        return block
+    def new_block(self) -> BasicBlock:  #cria boloco basico
+        block = BasicBlock(id=self._next_id)  #criando bloco e o id dele
+        self.blocks[block.id] = block #add no dict
+        self._next_id += 1 #++
+        return block  #devolve bloco criado
 
-    def _connect(self, source: BlockId, target: BlockId) -> None:
+    def _connect(self, source: BlockId, target: BlockId) -> None:  #aresta entre blocos
         """Atualize as duas pontas de uma aresta. Use terminate por fora."""
 
         self.blocks[source].successors.add(target)
         self.blocks[target].predecessors.add(source)
 
-    def terminate(self, block_id: BlockId, terminator: Terminator) -> None:
+    def terminate(self, block_id: BlockId, terminator: Terminator) -> None: #fecha um bloco com um terminador,, recebe o bloco que queremos temrinar e como o bloco vai terminar
         """Feche um bloco e registre as arestas descritas pelo terminador.
 
         Todos os destinos precisam existir. A construção da forma do grafo,
         incluindo a escolha desses destinos, permanece no CFGBuilder.
         """
 
-        block = self.blocks[block_id]
-        if block.terminator is not None:
+        block = self.blocks[block_id] #pega o bloco
+        if block.terminator is not None:  #v c o bloco tem um terminator
             raise ValueError(f"o bloco {block_id} já possui terminador")
+       #descobre o destino
 
-        if isinstance(terminator, Jump):
+        #variavel target tem os IDs dos blocos para os quais o bloco atual tem uma aresta
+        if isinstance(terminator, Jump): #ao terminar bloco atual segue diretametne para o bloco alvo
             targets = (terminator.target,)
-        elif isinstance(terminator, Branch):
+        #branch vai ter uma condicao e depois dois caminhos possiveis, um para caso seja V outro para  caso seja F
+        elif isinstance(terminator, Branch): #verifica uma condicao e define os dois possiveis destinos  (usar pra if e while)
             targets = (terminator.true_target, terminator.false_target)
-        elif isinstance(terminator, Return):
+        elif isinstance(terminator, Return):  #
             targets = (self.return_exit,)
         elif isinstance(terminator, Stop):
             targets = ()
         else:
             raise TypeError(f"terminador desconhecido: {type(terminator).__name__}")
 
-        for target in targets:
+        for target in targets:  # v c os destinos existem
             if target not in self.blocks:
                 raise ValueError(f"o bloco de destino {target} não existe")
 
-        block.terminator = terminator
+        block.terminator = terminator #salva o terminator
         for target in targets:
-            self._connect(block_id, target)
+            self._connect(block_id, target) #cria as arestas
 
 
 def format_cfg(cfg: CFG) -> str:

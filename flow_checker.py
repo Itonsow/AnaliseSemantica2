@@ -63,7 +63,17 @@ class ReadChecker:
             # TODO: teste a presença do símbolo no estado. Se faltar, armazene
             # UNINITIALIZED_READ usando o span desta ocorrência, não o da
             # declaração. Continue a visita para encontrar outras leituras.
-            raise NotImplementedError("implemente o diagnóstico de leitura")
+            #raise NotImplementedError("implemente o diagnóstico de leitura")
+            if symbol not in state:
+                mensagem = f"variavel '{expression.name}' pode não estar inicializada"
+                diagnostico = SemanticDiagnostic(
+                    kind=SemanticErrorKind.UNINITIALIZED_READ,
+                    message=mensagem,
+                    span=expression.span,
+                )
+                self.diagnostics.append(diagnostico)
+            return
+
         if isinstance(expression, (IntLiteral, BoolLiteral)):
             return
         if isinstance(expression, UnaryExpr):
@@ -89,4 +99,8 @@ def check_function_exit(cfg: CFG, reachable: set[int]) -> list[SemanticDiagnosti
         return []
     # TODO: devolva um diagnóstico MISSING_RETURN com o span da função.
     # Divergência em while (true) também pode tornar o fim inalcançável.
-    raise NotImplementedError("implemente o diagnóstico de retorno ausente")
+    #raise NotImplementedError("implemente o diagnóstico de retorno ausente")
+    erros = [] #lista de erros
+    mensagem = f"função '{cfg.function.name}' pode chegar ao fim sem retornar um valor"
+    erros.append(SemanticDiagnostic(SemanticErrorKind.MISSING_RETURN, mensagem, cfg.function.span)) #coloca o erro na lista
+    return erros #devolve a lista

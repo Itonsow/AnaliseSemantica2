@@ -16,5 +16,7 @@ def compute_reachable(cfg: CFG) -> set[BlockId]:
             continue
         # TODO: registre a visita e coloque os sucessores na lista de trabalho.
         # O conjunto de visitados precisa impedir repetição infinita nos ciclos.
-        raise NotImplementedError("implemente compute_reachable")
+        #raise NotImplementedError("implemente compute_reachable")
+        reachable.add(current) # marca antes de seguir, pra nao ficar rodando em circulos
+        pending.extend(cfg.blocks[current].successors)# coloca os prox blocos na fila
     return reachable
